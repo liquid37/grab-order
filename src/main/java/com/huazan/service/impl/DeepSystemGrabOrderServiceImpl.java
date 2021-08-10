@@ -4,18 +4,15 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.huazan.constants.DeepConstant;
 import com.huazan.constants.SystemConstant;
-import com.huazan.pojo.GrabOrderContent;
 import com.huazan.pojo.LoginResultInfo;
-import com.huazan.pojo.OrderInfo;
 import com.huazan.pojo.deep.DeepMatchRule;
 import com.huazan.pojo.deep.DeepSystemQO;
 import com.huazan.service.IGrabOrderMatchDataService;
 import com.huazan.utils.DeepSystemPropertiesUtil;
 import com.huazan.utils.DeepUserPropertiesUtil;
-import com.huazan.utils.ThreadPoolUtil;
 import com.huazan.utils.WebDriverUtil;
-import com.huazan.vo.GrabOrderInfoVO;
 import com.huazan.vo.DeepUserTokenInfo;
+import com.huazan.vo.GrabOrderInfoVO;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -30,13 +27,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import javax.print.DocFlavor;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -107,7 +102,7 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
             listQueryQO.setDAmtEnd(rule.getRuleParam().getMaxAmount() * 1000000+1);
         }
         if(rule.getRuleParam().getMinAmount()!=null){
-            listQueryQO.setDAmtEnd(rule.getRuleParam().getMinAmount() * 1000000-1);
+            listQueryQO.setDAmtStart(rule.getRuleParam().getMinAmount() * 1000000-1);
         }
         // todo 测试银行
         //listQueryQO.setKeyWords("广州银行");
@@ -143,4 +138,8 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
         return orderListVOList;
     }
 
+    @Override
+    String getSystemName() {
+        return SystemConstant.DEEP_SYSTEM_NAME;
+    }
 }

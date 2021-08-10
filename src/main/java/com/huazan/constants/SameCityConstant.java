@@ -16,4 +16,6 @@ public interface SameCityConstant {
 
     String SUBMIT_BUTTON = "submit_button";
 
+    String GRAB_URL = "grab_url";
+
 }

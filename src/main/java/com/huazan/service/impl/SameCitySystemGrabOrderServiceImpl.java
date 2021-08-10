@@ -1,13 +1,24 @@
 package com.huazan.service.impl;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.huazan.constants.SameCityConstant;
+import com.huazan.constants.SystemConstant;
 import com.huazan.pojo.LoginResultInfo;
 import com.huazan.pojo.samecity.SameCityMatchRule;
+import com.huazan.pojo.samecity.SameCityQO;
 import com.huazan.service.IGrabOrderMatchDataService;
 import com.huazan.utils.SameCitySystemPropertiesUtil;
 import com.huazan.utils.SameCityUserPropertiesUtil;
 import com.huazan.utils.WebDriverUtil;
 import com.huazan.vo.GrabOrderInfoVO;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.WebElement;
@@ -16,6 +27,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -57,10 +71,10 @@ public class SameCitySystemGrabOrderServiceImpl extends AbstractSystemGrabOrderS
         //点击登录按钮
         WebElement submitButton = WebDriverUtil.getElement(driver, By.ByXPath.xpath(SameCitySystemPropertiesUtil.get(SameCityConstant.SUBMIT_BUTTON))); // todo 改成配置
         submitButton.click();
-
+        TimeUnit.MILLISECONDS.sleep(2000);
         Cookie token = driver.manage().getCookieNamed("access_token");
         System.out.println("token=" + token);
-        LoginResultInfo loginResultInfo = new LoginResultInfo();
+        loginResultInfo = new LoginResultInfo();
         loginResultInfo.setToken("Bearer "+token.getValue());
     }
 
@@ -70,6 +84,58 @@ public class SameCitySystemGrabOrderServiceImpl extends AbstractSystemGrabOrderS
     }
 
     protected List<GrabOrderInfoVO> doQuery(SameCityMatchRule rule){
-        return null;
+        List<GrabOrderInfoVO> orderListVOList = new ArrayList<>();
+        // 查询当日我的订单
+        CloseableHttpClient httpClient = HttpClientBuilder.create().build();
+        HttpPost httpPost = new HttpPost(SameCitySystemPropertiesUtil.get(SameCityConstant.GRAB_URL));
+        // 由客户端执行(发送)Get请求
+        httpPost.addHeader("Authorization", loginResultInfo.getToken());
+        httpPost.addHeader("Content-Type", "application/json");
+        SameCityQO listQueryQO = new SameCityQO();
+        //listQueryQO.setDAmtStart(deepMatchRule.getRuleParam().getMinAmount()*1000000);
+        if(rule.getRuleParam().getMaxAmount()!=null) {
+            listQueryQO.setPriceEp(rule.getRuleParam().getMaxAmount()+"");
+        }
+        if(rule.getRuleParam().getMinAmount()!=null){
+            listQueryQO.setPriceSp(rule.getRuleParam().getMinAmount()+"");
+        }
+        // todo 测试银行
+        listQueryQO.setBankName("广州银行");
+        HttpEntity entity = new StringEntity(JSONObject.toJSONString(listQueryQO), "UTF-8");
+        //System.out.println("请求参数："+ JSONObject.toJSONString(listQueryQO));
+        httpPost.setEntity(entity);
+        // 响应模型
+        CloseableHttpResponse response = null;
+        try {
+            response = httpClient.execute(httpPost);
+            // 从响应模型中获取响应实体
+            HttpEntity responseEntity = response.getEntity();
+            String listResultJson = EntityUtils.toString(responseEntity);
+            JSONObject jsonObject = JSONObject.parseObject(listResultJson);
+            JSONArray jsonArray = jsonObject.getJSONObject("data").getJSONArray("list");
+
+            if(!jsonArray.isEmpty()){
+                Iterator<Object> iterator = jsonArray.stream().iterator();
+                while (iterator.hasNext()){
+                    JSONObject dataObject =  (JSONObject) iterator.next();
+                    GrabOrderInfoVO orderListVO = new GrabOrderInfoVO();
+                    orderListVO.setId(dataObject.getString("index"));
+                    orderListVO.setAcceptor(dataObject.getString("bankName"));
+                    orderListVO.setLimitDays(dataObject.getInteger("rateDay"));
+                    orderListVO.setRate(dataObject.getBigDecimal("yearQuote"));
+                    orderListVO.setAmount(dataObject.getLong("ticketPrice")+"万");
+                    orderListVO.setPublishTime(dataObject.getString("publishTime"));
+                    orderListVOList.add(orderListVO);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return orderListVOList;
+    }
+
+    @Override
+    String getSystemName() {
+        return SystemConstant.SAME_CITY_SYSTEM_NAME;
     }
 }

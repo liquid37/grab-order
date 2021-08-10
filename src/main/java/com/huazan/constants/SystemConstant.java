@@ -26,17 +26,10 @@ public interface SystemConstant {
     String DEEP_SYSTEM_NAME = "深度系统";
 
     /**
-     * 钉钉群秘钥
-     */
-    String DING_DING_SECRET = "secret";
-
-    /**
-     * 钉钉群钩子回调
-     */
-    String DING_DING_WEBHOOK="webhook";
-
-    /**
      * 钉钉群@人手机号
      */
     String NOTIFY_PHONE = "notify_phone";
+
+
+
 }

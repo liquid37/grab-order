@@ -21,6 +21,7 @@ public class DeepMatchData extends BaseMatchData {
         if(orderInfo.getAcceptor().contains(getAcceptor())  // 承兑人
                 && orderInfo.getLimitDays().intValue()>= limitDate // 期限以上
                 && (orderInfo.getRate().compareTo(rate.multiply(new BigDecimal("100"))) >= 0)) // 利率以上
+
         {
             return true;
         }

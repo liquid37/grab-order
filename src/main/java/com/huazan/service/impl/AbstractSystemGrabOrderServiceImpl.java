@@ -85,7 +85,7 @@ public abstract class AbstractSystemGrabOrderServiceImpl<R extends BaseMatchRule
             List<GrabOrderInfoVO> orderInfoVOS = doQuery(rule);
             GrabOrderContent content = new GrabOrderContent();
             content.setOrderInfoVOS(orderInfoVOS);
-            content.setSystemName(SystemConstant.DEEP_SYSTEM_NAME);
+            content.setSystemName(getSystemName());
             content.setMatchDataList(rule.getMatchDataList());
             grabOrderHandler.handler(content);
         });
@@ -97,5 +97,6 @@ public abstract class AbstractSystemGrabOrderServiceImpl<R extends BaseMatchRule
 
     abstract List<GrabOrderInfoVO> doQuery(R rule);
 
+    abstract String getSystemName();
 
 }
