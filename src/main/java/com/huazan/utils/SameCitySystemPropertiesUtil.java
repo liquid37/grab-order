@@ -10,15 +10,22 @@ public class SameCitySystemPropertiesUtil {
     private static Properties sameCityProperties = new Properties();
 
     static{
+        InputStream sameCityResource = null;
         try {
             //
             //InputStream sameCityResource = new BufferedInputStream(new FileInputStream("./config/same_city.properties"));
-            InputStream sameCityResource = SameCitySystemPropertiesUtil.class.getResourceAsStream("/config/same_city.properties");
+            sameCityResource = SameCitySystemPropertiesUtil.class.getResourceAsStream("/config/same_city.properties");
             sameCityProperties.load(sameCityResource);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            try {
+                sameCityResource.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 

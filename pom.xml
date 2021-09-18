@@ -78,6 +78,11 @@
             <version>0.5.9</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.huazan</groupId>
+            <artifactId>ding-talk</artifactId>
+            <version>1.0.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -97,7 +102,7 @@
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <!--指定main方法-->
-                                    <mainClass>com.liquid.spider.SpiderMain</mainClass>
+                                    <mainClass>com.huazan.GrabOrdersMain</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

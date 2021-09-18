@@ -16,6 +16,7 @@ import com.huazan.pojo.GrabOrderContent;
 import com.huazan.service.IGrabOrderHandler;
 import com.huazan.utils.CommonPropertiesUtil;
 import com.huazan.utils.DingTalkPropertiesUtil;
+import com.huazan.utils.ThreadPoolUtil;
 import com.huazan.vo.GrabOrderInfoVO;
 import com.taobao.api.ApiException;
 import net.jodah.expiringmap.ExpirationPolicy;
@@ -28,6 +29,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
@@ -41,17 +43,26 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Service("notifyHandler")
-public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler {
+public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, InitializingBean {
 
     static ExpiringMap<String, String> map = ExpiringMap.builder()
             .variableExpiration().expirationPolicy(ExpirationPolicy.CREATED).build();
 
+    public static final BlockingDeque<String> DEQUE = new LinkedBlockingDeque<>(200);
+
     private static final String TOKEN_KEY = "DING_TALK_TOKEN";
 
     private static final String NOTIFY_PHONE_KEY = "NOTIFY_PHONE";
+
+    private static final Integer PER_SEND_MESSAGE_SIZE = 3;
+
+    private static final String SPILT_LINE = "============================================";
 
     private static final String NEWLINE = "\n";
     private String notify_template =
@@ -73,15 +84,18 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler {
                     o.getLimitDays(),
                     o.getRate(),
                     grabOrderContent.getSystemName());
-            System.out.println("通知内容："+notifyContent);
+            //System.out.println("通知内容："+notifyContent);
+            DEQUE.add(notifyContent);
             // 群通知
             //notifyGroup(notifyContent);
             // 个人通知
+           /*
             try {
                 notifyUser(notifyContent);
             } catch (ApiException e) {
                 e.printStackTrace();
             }
+            */
         });
         return true;
     }
@@ -135,7 +149,7 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler {
         v2Request.setMsg(msg);
 
         OapiMessageCorpconversationAsyncsendV2Response response = client.execute(v2Request, token);
-        System.out.println(response.getBody());
+        //System.out.println("个人信息："+response.getBody());
     }
 
 
@@ -211,5 +225,27 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler {
         GrabOrderInfoNotifyHandler handler = new GrabOrderInfoNotifyHandler();
         handler.notifyUser("测试钉钉推送消息2");
 
+    }
+
+    @Override
+    public void afterPropertiesSet(){
+        ScheduledExecutorService executorService = ThreadPoolUtil.createScheduledExecutorService(1);
+        executorService.scheduleAtFixedRate(()->{
+            if(DEQUE.size() > 0){
+                if(DEQUE.size() > PER_SEND_MESSAGE_SIZE){
+                    String message1 = DEQUE.poll();
+                    String message2 = DEQUE.poll();
+                    String message3 = DEQUE.poll();
+                    StringBuffer sb = new StringBuffer();
+                    sb.append(message1).append(NEWLINE).append(SPILT_LINE).append(NEWLINE)
+                            .append(message2).append(NEWLINE).append(SPILT_LINE).append(NEWLINE)
+                            .append(message3).append(NEWLINE).append(SPILT_LINE).append(NEWLINE);
+                    notifyGroup(sb.toString());
+                }else {
+                    String content = DEQUE.poll();
+                    notifyGroup(content);
+                }
+            }
+        },1,3,TimeUnit.SECONDS);
     }
 }

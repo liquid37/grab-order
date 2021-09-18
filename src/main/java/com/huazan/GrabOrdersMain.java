@@ -19,20 +19,27 @@ public class GrabOrdersMain {
         System.out.println("请选择抓单的网站");
         System.out.println("1.同城");
         System.out.println("2.深度");
+        System.out.println("3.两个系统同时启动");
         System.out.println("按数字 + 回车进行选择，其他为退出");
         Scanner sc = new Scanner(System.in);
         int spiderSystem = sc.nextInt();
         ISystemGrabOrderService grabOrderService = null;
         if (spiderSystem == 1) {
             grabOrderService = context.getBean("sameSystem",ISystemGrabOrderService.class);
+            grabOrderService.grabOrder();
         } else if (spiderSystem == 2) {
             grabOrderService = context.getBean("deepSystem",ISystemGrabOrderService.class);
-        } else {
+            grabOrderService.grabOrder();
+        } else if(spiderSystem == 3){
+            ISystemGrabOrderService sameSystem = context.getBean("sameSystem",ISystemGrabOrderService.class);
+            sameSystem.grabOrder();
+
+            ISystemGrabOrderService deepSystem = context.getBean("deepSystem",ISystemGrabOrderService.class);
+            deepSystem.grabOrder();
+        }
+        else {
             System.exit(0);
         }
-        //while (true) {
-            grabOrderService.grabOrder();
-        //}
     }
 }
 

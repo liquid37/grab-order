@@ -14,6 +14,7 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -52,6 +53,7 @@ public abstract class AbstractSystemGrabOrderServiceImpl<R extends BaseMatchRule
     }
 
     @Override
+    @Async
     public void grabOrder() throws Exception {
         //1、执行登录，获取token信息
         login();

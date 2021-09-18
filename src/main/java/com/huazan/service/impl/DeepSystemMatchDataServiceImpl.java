@@ -10,6 +10,7 @@ import com.huazan.utils.EasyPoiSheetNameUtil;
 import org.springframework.stereotype.Service;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,7 @@ import java.util.Map;
 public class DeepSystemMatchDataServiceImpl extends AbstractSystemMatchDataServiceImpl<DeepMatchRule> implements IGrabOrderMatchDataService {
 
     @Override
-    public void loadMatchData() {
+    public void loadMatchData() throws IOException {
         if(matchDatas.size() == 0){
             InputStream inputStream = null;
             try {
@@ -42,6 +43,10 @@ public class DeepSystemMatchDataServiceImpl extends AbstractSystemMatchDataServi
                 });
             } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+                if(inputStream!=null){
+                    inputStream.close();
+                }
             }
         }
     }

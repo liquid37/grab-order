@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.huazan.constants.DeepConstant;
 import com.huazan.constants.SystemConstant;
 import com.huazan.pojo.LoginResultInfo;
+import com.huazan.pojo.deep.DeepMatchData;
 import com.huazan.pojo.deep.DeepMatchRule;
 import com.huazan.pojo.deep.DeepSystemQO;
 import com.huazan.service.IGrabOrderMatchDataService;
@@ -13,6 +14,7 @@ import com.huazan.utils.DeepUserPropertiesUtil;
 import com.huazan.utils.WebDriverUtil;
 import com.huazan.vo.DeepUserTokenInfo;
 import com.huazan.vo.GrabOrderInfoVO;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -29,10 +31,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 深度系统抢单service实现
@@ -105,7 +106,11 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
             listQueryQO.setDAmtStart(rule.getRuleParam().getMinAmount() * 1000000-1);
         }
         // todo 测试银行
-        //listQueryQO.setKeyWords("广州银行");
+        Map<String, String> acceptorMap = rule.getMatchDataList().stream().collect(Collectors.toMap(DeepMatchData::getAcceptor, DeepMatchData::getAcceptor));
+        Set<String> acceptorList = acceptorMap.keySet();
+        String acceptors = StringUtils.join(acceptorList, ",");
+        listQueryQO.setKeyWords(acceptors);
+        //listQueryQO.setKeyWords("广州银行股份有限公司");
         HttpEntity entity = new StringEntity(JSONObject.toJSONString(listQueryQO), "UTF-8");
         httpPost.setEntity(entity);
         // 响应模型

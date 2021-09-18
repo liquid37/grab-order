@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.huazan.constants.SameCityConstant;
 import com.huazan.constants.SystemConstant;
 import com.huazan.pojo.LoginResultInfo;
+import com.huazan.pojo.samecity.SameCityMatchData;
 import com.huazan.pojo.samecity.SameCityMatchRule;
 import com.huazan.pojo.samecity.SameCityQO;
 import com.huazan.service.IGrabOrderMatchDataService;
@@ -12,6 +13,7 @@ import com.huazan.utils.SameCitySystemPropertiesUtil;
 import com.huazan.utils.SameCityUserPropertiesUtil;
 import com.huazan.utils.WebDriverUtil;
 import com.huazan.vo.GrabOrderInfoVO;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -28,10 +30,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 同城系统抢单service实现
@@ -84,6 +85,9 @@ public class SameCitySystemGrabOrderServiceImpl extends AbstractSystemGrabOrderS
     }
 
     protected List<GrabOrderInfoVO> doQuery(SameCityMatchRule rule){
+        Map<String, String> acceptorMap = rule.getMatchDataList().stream().collect(Collectors.toMap(SameCityMatchData::getAcceptor, SameCityMatchData::getAcceptor));
+        Set<String> acceptorList = acceptorMap.keySet();
+        String acceptors = StringUtils.join(acceptorList, ",");
         List<GrabOrderInfoVO> orderListVOList = new ArrayList<>();
         // 查询当日我的订单
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
@@ -99,8 +103,7 @@ public class SameCitySystemGrabOrderServiceImpl extends AbstractSystemGrabOrderS
         if(rule.getRuleParam().getMinAmount()!=null){
             listQueryQO.setPriceSp(rule.getRuleParam().getMinAmount()+"");
         }
-        // todo 测试银行
-        listQueryQO.setBankName("广州银行");
+        listQueryQO.setBankName(acceptors);
         HttpEntity entity = new StringEntity(JSONObject.toJSONString(listQueryQO), "UTF-8");
         //System.out.println("请求参数："+ JSONObject.toJSONString(listQueryQO));
         httpPost.setEntity(entity);
@@ -119,7 +122,7 @@ public class SameCitySystemGrabOrderServiceImpl extends AbstractSystemGrabOrderS
                 while (iterator.hasNext()){
                     JSONObject dataObject =  (JSONObject) iterator.next();
                     GrabOrderInfoVO orderListVO = new GrabOrderInfoVO();
-                    orderListVO.setId(dataObject.getString("index"));
+                    orderListVO.setId(dataObject.getString("ticketId"));
                     orderListVO.setAcceptor(dataObject.getString("bankName"));
                     orderListVO.setLimitDays(dataObject.getInteger("rateDay"));
                     orderListVO.setRate(dataObject.getBigDecimal("yearQuote"));
