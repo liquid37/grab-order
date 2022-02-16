@@ -17,4 +17,8 @@ public interface DeepConstant {
     String SUBMIT_BUTTON = "submit_button";
 
     String GRAB_URL = "grab_url";
+
+    String ACCOUNT2 = "account2";
+
+    String PASSWORD2 = "password2";
 }

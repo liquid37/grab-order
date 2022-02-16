@@ -17,4 +17,9 @@ public class LoginResultInfo {
      * 过期时间
      */
     private Long expiredTime;
+
+    /**
+     * 用户id
+     */
+    private String userId;
 }

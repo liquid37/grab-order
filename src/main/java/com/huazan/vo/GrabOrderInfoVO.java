@@ -40,12 +40,18 @@ public class GrabOrderInfoVO {
      */
     private String amount;
 
+    /**
+     * 通知群
+     */
+    private String notifyGroup;
+
     public boolean matchData(List matchDataList){
 
         for(Object data : matchDataList){
             if(data instanceof BaseMatchData){
                 BaseMatchData matchData = (BaseMatchData)data;
                 if(matchData.match(this)){
+                    this.setNotifyGroup(matchData.getNotifyGroup());
                     return true;
                 }
             }

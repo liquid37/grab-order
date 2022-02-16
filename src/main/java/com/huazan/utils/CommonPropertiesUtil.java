@@ -11,7 +11,7 @@ public class CommonPropertiesUtil {
         try {
             //
             InputStream sameCityResource = new BufferedInputStream(new FileInputStream("./config/common.properties"));
-            commonProperties.load(sameCityResource);
+            commonProperties.load(new InputStreamReader(sameCityResource, "utf-8"));
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();

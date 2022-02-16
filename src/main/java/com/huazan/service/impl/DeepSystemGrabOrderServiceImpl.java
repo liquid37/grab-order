@@ -55,23 +55,37 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
         return grabOrderMatchDataService;
     }
 
+    private static final String LOGIN_RESULT_KEY = "deep-system-login";
+
+    private static Integer count = 1;
+
     @Override
     void doLogin() throws Exception {
         //定位账号输入框
         WebElement accountElement = WebDriverUtil.getElement(driver, By.ByXPath.xpath(DeepSystemPropertiesUtil.get(DeepConstant.LOGIN_ACCOUNT_INPUT)));
         accountElement.clear(); // 清空账号
-        accountElement.sendKeys(DeepUserPropertiesUtil.get(DeepConstant.ACCOUNT)); // 设置账号
-        TimeUnit.MILLISECONDS.sleep(500);
-        WebElement passwordElement = WebDriverUtil.getElement(driver, By.ByXPath.xpath(DeepSystemPropertiesUtil.get(DeepConstant.LOGIN_PASSWORD_INPUT)));
-        passwordElement.clear(); // 清空密码
-        passwordElement.sendKeys(DeepUserPropertiesUtil.get(DeepConstant.PASSWORD)); // 设置密码
-        //定位滑块 ,滑块长度为 40 * 34  ,整个滑块区域为360 * 34 ，因此计算出滑动距离为360-40 = 320
+        count = count * -1;
+        if(count == 1){
+            accountElement.sendKeys(DeepUserPropertiesUtil.get(DeepConstant.ACCOUNT)); // 设置账号
+            TimeUnit.MILLISECONDS.sleep(500);
+            WebElement passwordElement = WebDriverUtil.getElement(driver, By.ByXPath.xpath(DeepSystemPropertiesUtil.get(DeepConstant.LOGIN_PASSWORD_INPUT)));
+            passwordElement.clear(); // 清空密码
+            passwordElement.sendKeys(DeepUserPropertiesUtil.get(DeepConstant.PASSWORD)); // 设置密码
+        }else{
+            accountElement.sendKeys(DeepUserPropertiesUtil.get(DeepConstant.ACCOUNT2)); // 设置账号
+            TimeUnit.MILLISECONDS.sleep(500);
+            WebElement passwordElement = WebDriverUtil.getElement(driver, By.ByXPath.xpath(DeepSystemPropertiesUtil.get(DeepConstant.LOGIN_PASSWORD_INPUT)));
+            passwordElement.clear(); // 清空密码
+            passwordElement.sendKeys(DeepUserPropertiesUtil.get(DeepConstant.PASSWORD2)); // 设置密码
+        }
+
+        //定位滑块 ,滑块长度为 40 * 34  ,整个滑块区域为380 * 98 ，因此计算出滑动距离为380-40 = 340
         WebElement scaleElement = WebDriverUtil.getElement(driver, By.ByXPath.xpath(DeepSystemPropertiesUtil.get(DeepConstant.SCALE_INPUT)));
 
         Actions action = new Actions(driver);
         // 滑动滑块
         TimeUnit.SECONDS.sleep(1);
-        action.dragAndDropBy(scaleElement, 320, 0).perform();
+        action.dragAndDropBy(scaleElement, 350, 0).perform();
         TimeUnit.MILLISECONDS.sleep(500);
         //点击登录按钮
         WebElement submitButton = WebDriverUtil.getElement(driver, By.ByXPath.xpath(DeepSystemPropertiesUtil.get(DeepConstant.SUBMIT_BUTTON))); // todo 改成配置
@@ -83,20 +97,31 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
         DeepUserTokenInfo tokenInfo = JSONObject.parseObject(loginUserInfo, DeepUserTokenInfo.class);
         String token = tokenInfo.getToken();
 
-        loginResultInfo = new LoginResultInfo();
+        LoginResultInfo loginResultInfo = new LoginResultInfo();
         loginResultInfo.setToken(token);
         loginResultInfo.setExpiredTime(24 * 60 * 60 * 1000L);
+        loginResultInfo.setUserId(tokenInfo.getUserId());
+        loginResultInfoMap.put(LOGIN_RESULT_KEY,loginResultInfo,60*60*2,TimeUnit.SECONDS);
+
     }
 
     @Override
-    protected List<GrabOrderInfoVO> doQuery(DeepMatchRule rule) {
+    protected List<GrabOrderInfoVO> doQuery(DeepMatchRule rule) throws Exception {
         List<GrabOrderInfoVO> orderListVOList = new ArrayList<>();
         // 查询当日我的订单
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         HttpPost httpPost = new HttpPost(DeepSystemPropertiesUtil.get(DeepConstant.GRAB_URL));
         // 由客户端执行(发送)Get请求
+        LoginResultInfo loginResultInfo = loginResultInfoMap.get(LOGIN_RESULT_KEY);
+        /*
+        if(loginResultInfo == null){
+            login();
+            loginResultInfo = loginResultInfoMap.get(LOGIN_RESULT_KEY);
+        }
+        */
         httpPost.addHeader("token", loginResultInfo.getToken());
         httpPost.addHeader("Content-Type", "application/json");
+        httpPost.addHeader("userid",loginResultInfo.getUserId());
         DeepSystemQO listQueryQO = new DeepSystemQO();
         //listQueryQO.setDAmtStart(deepMatchRule.getRuleParam().getMinAmount()*1000000);
         if(rule.getRuleParam().getMaxAmount()!=null) {
@@ -105,6 +130,7 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
         if(rule.getRuleParam().getMinAmount()!=null){
             listQueryQO.setDAmtStart(rule.getRuleParam().getMinAmount() * 1000000-1);
         }
+
         // todo 测试银行
         Map<String, String> acceptorMap = rule.getMatchDataList().stream().collect(Collectors.toMap(DeepMatchData::getAcceptor, DeepMatchData::getAcceptor));
         Set<String> acceptorList = acceptorMap.keySet();
@@ -120,6 +146,9 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
             // 从响应模型中获取响应实体
             HttpEntity responseEntity = response.getEntity();
             String listResultJson = EntityUtils.toString(responseEntity);
+            //System.out.println("============================listResultJson==========================");
+            //System.out.println(listResultJson);
+            //System.out.println("============================listResultJson==========================");
             JSONObject jsonObject = JSONObject.parseObject(listResultJson);
             JSONArray jsonArray = jsonObject.getJSONObject("page").getJSONArray("list");
 
@@ -137,8 +166,9 @@ public class DeepSystemGrabOrderServiceImpl extends AbstractSystemGrabOrderServi
                     orderListVOList.add(orderListVO);
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+            //System.exit(0);
         }
         return orderListVOList;
     }

@@ -18,4 +18,8 @@ public interface SameCityConstant {
 
     String GRAB_URL = "grab_url";
 
+    String AGREE_CHECKBOX = "agree_checkbox";
+
+    String VERSION = "version";
+
 }

@@ -13,5 +13,8 @@ public abstract class BaseMatchData {
     @Excel(name = "承兑行")
     private String acceptor;
 
+    @Excel(name = "通知群")
+    private String notifyGroup;
+
     public abstract boolean match(GrabOrderInfoVO orderInfo);
 }

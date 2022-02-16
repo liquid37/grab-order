@@ -11,6 +11,16 @@ public interface SystemConstant {
     String WEB_DRIVER_KEY = "web_driver";
 
     /**
+     * 火狐浏览器驱动常量名
+     */
+    String FIREFOX_WEB_DRIVER_KEY = "firefox_web_driver";
+
+    /**
+     * 火狐浏览器驱动常量值
+     */
+    String FIREFOX_WEB_DRIVER_VALUE = "firefox_web_driver_value";
+
+    /**
      * 浏览器驱动常量值
      */
     String WEB_DRIVER_VALUE = "web_driver_value";
@@ -30,6 +40,9 @@ public interface SystemConstant {
      */
     String NOTIFY_PHONE = "notify_phone";
 
-
+    /**
+     * 钉钉通知群名
+     */
+    String NOTIFY_GROUP = "notify_group";
 
 }

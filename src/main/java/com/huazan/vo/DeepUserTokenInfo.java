@@ -8,4 +8,6 @@ public class DeepUserTokenInfo{
     private String token;
     // 公司名
     private String corpName;
+
+    private String userId;
 }

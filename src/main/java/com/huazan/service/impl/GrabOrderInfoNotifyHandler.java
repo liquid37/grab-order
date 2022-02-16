@@ -18,6 +18,7 @@ import com.huazan.utils.CommonPropertiesUtil;
 import com.huazan.utils.DingTalkPropertiesUtil;
 import com.huazan.utils.ThreadPoolUtil;
 import com.huazan.vo.GrabOrderInfoVO;
+import com.huazan.vo.NotifyVO;
 import com.taobao.api.ApiException;
 import net.jodah.expiringmap.ExpirationPolicy;
 import net.jodah.expiringmap.ExpiringMap;
@@ -39,14 +40,8 @@ import java.net.URLEncoder;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 
 @Service("notifyHandler")
 public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, InitializingBean {
@@ -54,7 +49,11 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
     static ExpiringMap<String, String> map = ExpiringMap.builder()
             .variableExpiration().expirationPolicy(ExpirationPolicy.CREATED).build();
 
-    public static final BlockingDeque<String> DEQUE = new LinkedBlockingDeque<>(200);
+
+
+    public static final Map<String,BlockingDeque<NotifyVO>> MAP_DEQUE = new ConcurrentHashMap<>();
+
+    public static Map<String, ScheduledExecutorService> MAP_EXECUTOR_SERVICE = new HashMap<>();
 
     private static final String TOKEN_KEY = "DING_TALK_TOKEN";
 
@@ -74,6 +73,8 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
             "利率：{4} %" + NEWLINE
             ;
 
+    private Map<String,NotifyVO> notifyGroups = new HashMap<>();
+
     @Override
     public boolean handler(GrabOrderContent grabOrderContent) {
         List<GrabOrderInfoVO> orderInfoVOS = grabOrderContent.getOrderInfoVOS();
@@ -85,7 +86,22 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
                     o.getRate(),
                     grabOrderContent.getSystemName());
             //System.out.println("通知内容："+notifyContent);
-            DEQUE.add(notifyContent);
+            NotifyVO notifyVO = new NotifyVO();
+            notifyVO.setContent(notifyContent);
+            try {
+                NotifyVO notifyGroupProperties = getNotifyGroup(o.getNotifyGroup());
+                notifyVO.setAccessToken(notifyGroupProperties.getAccessToken());
+                notifyVO.setSecret(notifyGroupProperties.getSecret());
+            } catch (Exception e) {
+                return;
+            }
+            //DEQUE.add(notifyVO);
+            BlockingDeque<NotifyVO> notifyQueue = MAP_DEQUE.get(o.getNotifyGroup());
+            if(notifyQueue == null){
+                notifyQueue = new LinkedBlockingDeque<>(200);
+            }
+            notifyQueue.add(notifyVO);
+            MAP_DEQUE.put(o.getNotifyGroup(),notifyQueue);
             // 群通知
             //notifyGroup(notifyContent);
             // 个人通知
@@ -100,6 +116,7 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
         return true;
     }
 
+/*
 
     private void notifyUser(String content) throws ApiException {
         String token = map.get(TOKEN_KEY);
@@ -151,18 +168,20 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
         OapiMessageCorpconversationAsyncsendV2Response response = client.execute(v2Request, token);
         //System.out.println("个人信息："+response.getBody());
     }
+*/
 
 
-    private void notifyGroup(String content){
+    private void notifyGroup(String content,String accessToken,String secretKey){
+        //System.out.println(accessToken+NEWLINE+"通知内容："+content);
         // 创建Httpclient对象
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         CloseableHttpResponse response = null;
         String resultString = null;
         try {
             Long timestamp = System.currentTimeMillis();
-            String sign = sign(timestamp);
+            String sign = sign(timestamp,secretKey);
             // 创建Http Post请求
-            HttpPost httpPost = new HttpPost(DingTalkPropertiesUtil.get(DingTalkConstant.DING_DING_WEBHOOK)+"&timestamp="+timestamp+"&sign="+sign);
+            HttpPost httpPost = new HttpPost(DingTalkPropertiesUtil.get(DingTalkConstant.DING_DING_WEBHOOK)+accessToken+"&timestamp="+timestamp+"&sign="+sign);
             httpPost.addHeader("Content-Type", "application/json");
 
             if (content != null) {
@@ -186,7 +205,7 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
             // 执行http请求
             response = httpClient.execute(httpPost);
             resultString = EntityUtils.toString(response.getEntity(), "utf-8");
-            //System.out.println("钉钉机器人人返回结果："+resultString);
+            System.out.println("钉钉机器人人返回结果："+resultString);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -200,8 +219,8 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
         }
     }
 
-    private String sign(Long timestamp) throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidKeyException {
-        String secret = DingTalkPropertiesUtil.get(DingTalkConstant.DING_DING_SECRET);
+    private String sign(Long timestamp,String secret) throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidKeyException {
+        //String secret = DingTalkPropertiesUtil.get(DingTalkConstant.DING_DING_SECRET);
 
         String stringToSign = timestamp + "\n" + secret;
         Mac mac = Mac.getInstance("HmacSHA256");
@@ -221,31 +240,73 @@ public class GrabOrderInfoNotifyHandler implements IGrabOrderHandler, Initializi
         return phones;
     }
 
+    private NotifyVO getNotifyGroup(String groupName) throws Exception {
+        NotifyVO notifyVO = notifyGroups.get(groupName);
+        if(Objects.isNull(notifyVO)){
+            synchronized (GrabOrderInfoNotifyHandler.class){
+                notifyVO = notifyGroups.get(groupName);
+                if(Objects.isNull(notifyVO)){
+                    String notifyGroupStr = CommonPropertiesUtil.get(SystemConstant.NOTIFY_GROUP);
+                    String[] groups = notifyGroupStr.split(",");
+                    for (String group : groups) {
+                        String[] groupData = group.split("::");
+                        notifyVO = new NotifyVO();
+                        notifyVO.setAccessToken(groupData[1]);
+                        notifyVO.setSecret(groupData[2]);
+                        notifyGroups.put(groupData[0],notifyVO);
+                    }
+                    notifyVO = notifyGroups.get(groupName);
+                    if (Objects.isNull(notifyVO)){
+                        throw new Exception("没有配置钉群【"+ groupName +"】access_token，请检查对应的配置文件");
+                    }
+                }else{
+                    return notifyVO;
+                }
+            }
+        }
+        return notifyVO;
+    }
+
     public static void main(String[] args) throws ApiException, InterruptedException {
         GrabOrderInfoNotifyHandler handler = new GrabOrderInfoNotifyHandler();
-        handler.notifyUser("测试钉钉推送消息2");
+        //handler.notifyUser("测试钉钉推送消息2");
 
     }
 
     @Override
     public void afterPropertiesSet(){
-        ScheduledExecutorService executorService = ThreadPoolUtil.createScheduledExecutorService(1);
-        executorService.scheduleAtFixedRate(()->{
-            if(DEQUE.size() > 0){
-                if(DEQUE.size() > PER_SEND_MESSAGE_SIZE){
-                    String message1 = DEQUE.poll();
-                    String message2 = DEQUE.poll();
-                    String message3 = DEQUE.poll();
-                    StringBuffer sb = new StringBuffer();
-                    sb.append(message1).append(NEWLINE).append(SPILT_LINE).append(NEWLINE)
-                            .append(message2).append(NEWLINE).append(SPILT_LINE).append(NEWLINE)
-                            .append(message3).append(NEWLINE).append(SPILT_LINE).append(NEWLINE);
-                    notifyGroup(sb.toString());
-                }else {
-                    String content = DEQUE.poll();
-                    notifyGroup(content);
+        ScheduledExecutorService checkNotifyGroupExecutorService = ThreadPoolUtil.createScheduledExecutorService(1);
+        checkNotifyGroupExecutorService.scheduleAtFixedRate(()->{
+            Set<String> groupNames = MAP_DEQUE.keySet();
+            groupNames.forEach(groupName ->{
+                // 没有对应钉群的通知定时任务，则创建一个对应钉群的通知任务
+                if(!MAP_EXECUTOR_SERVICE.containsKey(groupName)){
+                    ScheduledExecutorService executorService = ThreadPoolUtil.createScheduledExecutorService(1);
+                    executorService.scheduleAtFixedRate(()->{
+                        BlockingDeque<NotifyVO> deque = MAP_DEQUE.get(groupName);
+                        if(deque.size() > 0){
+                            if(deque.size() > PER_SEND_MESSAGE_SIZE){
+                                NotifyVO notifyVO1 = deque.poll();
+                                NotifyVO notifyVO2 = deque.poll();
+                                NotifyVO notifyVO3 = deque.poll();
+                                StringBuffer sb = new StringBuffer();
+                                sb.append(notifyVO1.getContent()).append(NEWLINE).append(SPILT_LINE).append(NEWLINE)
+                                        .append(notifyVO2.getContent()).append(NEWLINE).append(SPILT_LINE).append(NEWLINE)
+                                        .append(notifyVO3.getContent()).append(NEWLINE).append(SPILT_LINE).append(NEWLINE);
+                                notifyGroup(sb.toString(),notifyVO1.getAccessToken(),notifyVO1.getSecret());
+                            }else {
+                                NotifyVO notifyVO = deque.poll();
+                                notifyGroup(notifyVO.getContent(),notifyVO.getAccessToken(),notifyVO.getSecret());
+                            }
+                        }
+                    },1,3,TimeUnit.SECONDS);
+                    MAP_EXECUTOR_SERVICE.put(groupName,executorService);
                 }
-            }
-        },1,3,TimeUnit.SECONDS);
+            });
+        },1,5,TimeUnit.SECONDS);
+
+
     }
+
+
 }
